@@ -2,3 +2,4 @@
 fakenos
 pytest
 pytest-cov
+pytest-timeout

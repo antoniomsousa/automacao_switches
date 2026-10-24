@@ -6,9 +6,15 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# A new push cancels the run still in progress for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   testes-e-sonarcloud:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,7 +28,16 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Testes com cobertura
-        run: python -m pytest --cov=app --cov-report=xml
+        shell: bash
+        run: python -m pytest -v --cov=app --cov-report=xml 2>&1 | tee pytest.log
+
+      - name: Resumo dos testes com falha
+        if: failure()
+        shell: bash
+        # Turn the end of the pytest log into an annotation, visible on the run page
+        run: |
+          msg=$(tail -n 80 pytest.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=pytest::${msg}"
 
       - name: SonarCloud
         uses: SonarSource/sonarqube-scan-action@v5
