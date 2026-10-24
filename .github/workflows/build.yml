@@ -29,10 +29,10 @@ jobs:
 
       - name: Testes com cobertura
         shell: bash
-        run: python -m pytest -v --cov=app --cov-report=xml 2>&1 | tee pytest.log
+        run: python -m pytest -v --maxfail=3 --timeout=30 --cov=app --cov-report=xml 2>&1 | tee pytest.log
 
       - name: Resumo dos testes com falha
-        if: failure()
+        if: failure() || cancelled()
         shell: bash
         # Turn the end of the pytest log into an annotation, visible on the run page
         run: |
