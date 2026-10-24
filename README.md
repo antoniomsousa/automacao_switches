@@ -35,10 +35,6 @@ tests/
 run.py                              Ponto de entrada
 ```
 
-## Logo da empresa
-
-Coloque o arquivo oficial do logo do Mercado Livre em `app/static/img/logo-meli.svg` (ou `logo-meli.png`).
-O cabeçalho passa a usá-lo automaticamente; sem o arquivo, aparece um selo com o texto "mercado livre".
 
 ## Instalação
 
