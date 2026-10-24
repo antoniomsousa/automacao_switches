@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Switch automatizado">
+  <circle cx="64" cy="64" r="62" fill="#2D3277"/>
+  <!-- Gear: automation -->
+  <g fill="#FFE600">
+    <g id="dente"><rect x="59" y="20" width="10" height="10" rx="2"/></g>
+    <use href="#dente" transform="rotate(45 64 42)"/>
+    <use href="#dente" transform="rotate(90 64 42)"/>
+    <use href="#dente" transform="rotate(135 64 42)"/>
+    <use href="#dente" transform="rotate(180 64 42)"/>
+    <use href="#dente" transform="rotate(225 64 42)"/>
+    <use href="#dente" transform="rotate(270 64 42)"/>
+    <use href="#dente" transform="rotate(315 64 42)"/>
+    <circle cx="64" cy="42" r="16"/>
+  </g>
+  <circle cx="64" cy="42" r="7" fill="#2D3277"/>
+  <!-- Link from gear to switch -->
+  <path d="M64 62 V74" stroke="#FFE600" stroke-width="3" stroke-dasharray="3 3" stroke-linecap="round"/>
+  <!-- Switch -->
+  <rect x="20" y="74" width="88" height="30" rx="5" fill="#FFFFFF"/>
+  <g fill="#2D3277">
+    <rect x="28" y="81" width="9" height="8" rx="1"/>
+    <rect x="41" y="81" width="9" height="8" rx="1"/>
+    <rect x="54" y="81" width="9" height="8" rx="1"/>
+    <rect x="67" y="81" width="9" height="8" rx="1"/>
+    <rect x="80" y="81" width="9" height="8" rx="1"/>
+    <rect x="93" y="81" width="9" height="8" rx="1"/>
+  </g>
+  <g fill="#00A650">
+    <circle cx="32.5" cy="96" r="2"/>
+    <circle cx="45.5" cy="96" r="2"/>
+    <circle cx="71.5" cy="96" r="2"/>
+    <circle cx="97.5" cy="96" r="2"/>
+  </g>
+  <g fill="#FFB800">
+    <circle cx="58.5" cy="96" r="2"/>
+    <circle cx="84.5" cy="96" r="2"/>
+  </g>
+</svg>

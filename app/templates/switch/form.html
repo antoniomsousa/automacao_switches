@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block content %}
+<form id="form-switch" class="painel" action="{{ url_for('switch.executar') }}" method="post" novalidate>
+
+  <section class="card secao conexao">
+    <div class="card-ilustracao">
+      <img src="{{ url_for('static', filename='img/switch-automation.svg') }}" alt="">
+      <div>
+        <h2>Conexão</h2>
+        <p class="dica">Dados de acesso SSH ao switch. Usados em todas as ações.</p>
+      </div>
+    </div>
+
+    <label class="campo">
+      <span>Endereço do switch</span>
+      <input type="text" name="ip" placeholder="ex.: 10.0.0.1" required autocomplete="off" data-lembrar>
+      <small class="erro-campo"></small>
+    </label>
+    <label class="campo">
+      <span>Porta SSH</span>
+      <input type="number" name="port" value="22" min="1" max="65535" data-lembrar>
+      <small class="erro-campo"></small>
+    </label>
+    <label class="campo">
+      <span>Usuário</span>
+      <input type="text" name="username" required autocomplete="username" data-lembrar>
+      <small class="erro-campo"></small>
+    </label>
+    <label class="campo">
+      <span>Senha</span>
+      <span class="senha">
+        <input type="password" name="password" required autocomplete="current-password">
+        <button type="button" class="mostrar-senha" aria-label="Mostrar senha">Mostrar</button>
+      </span>
+      <small class="erro-campo"></small>
+    </label>
+    <label class="campo">
+      <span>Enable secret <em>(opcional)</em></span>
+      <span class="senha">
+        <input type="password" name="secret" autocomplete="off">
+        <button type="button" class="mostrar-senha" aria-label="Mostrar enable secret">Mostrar</button>
+      </span>
+      <small class="dica">Deixe vazio se o usuário já entra no modo privilegiado (#).</small>
+    </label>
+  </section>
+
+  <div class="acoes">
+    <section class="card secao">
+      <h2 class="card-titulo">
+        <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5Zm-8.6 9.3L2 12l10 5 10-5-1.4-.7L12 15.6 3.4 11.3Zm0 5L2 17l10 5 10-5-1.4-.7L12 20.6l-8.6-4.3Z"/></svg>
+        Criar VLAN
+      </h2>
+      <div class="linha">
+        <label class="campo campo-curto">
+          <span>VLAN ID</span>
+          <input type="number" name="vlan_id" min="2" max="4094" placeholder="2–4094" data-validar="vlan_id">
+          <small class="erro-campo"></small>
+        </label>
+        <label class="campo">
+          <span>Nome da VLAN</span>
+          <input type="text" name="vlan_name" maxlength="32" placeholder="ex.: USUARIOS" data-validar="vlan_name">
+          <small class="erro-campo"></small>
+        </label>
+      </div>
+      <button type="submit" class="botao botao-primario" name="acao" value="criar_vlan">Criar VLAN</button>
+    </section>
+
+    <section class="card secao">
+      <h2 class="card-titulo">
+        <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 11.6 12.4 2.6A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7c0 .6.2 1.1.6 1.4l9 9a2 2 0 0 0 2.8 0l7-7a2 2 0 0 0 0-2.8ZM6.5 8A1.5 1.5 0 1 1 6.5 5a1.5 1.5 0 0 1 0 3Z"/></svg>
+        Alterar hostname
+      </h2>
+      <label class="campo">
+        <span>Novo hostname</span>
+        <input type="text" name="hostname" maxlength="63" placeholder="ex.: SW_AUTOMATIZADO" data-validar="hostname">
+        <small class="erro-campo"></small>
+      </label>
+      <button type="submit" class="botao botao-primario" name="acao" value="hostname">Alterar hostname</button>
+    </section>
+
+    <section class="card secao">
+      <h2 class="card-titulo">
+        <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4Zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm3-10H5V5h10v4Z"/></svg>
+        Configuração
+      </h2>
+      <p class="dica">VLANs e hostname alterados ficam só na running-config até você salvar.</p>
+      <div class="linha-botoes">
+        <button type="submit" class="botao botao-sucesso" name="acao" value="salvar">
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4Zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm3-10H5V5h10v4Z"/></svg>
+          Salvar config (NVRAM)
+        </button>
+        <button type="submit" class="botao botao-secundario" name="acao" value="backup">
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2Zm7-3 6-6-1.4-1.4L13 13.2V3h-2v10.2L7.4 9.6 6 11l6 6Z"/></svg>
+          Baixar backup
+        </button>
+      </div>
+    </section>
+  </div>
+</form>
+
+<div id="carregando" class="carregando" hidden>
+  <div class="carregando-caixa">
+    <div class="spinner">
+      <img src="{{ url_for('static', filename='img/switch-automation.svg') }}" alt="">
+    </div>
+    <p id="carregando-texto">Conectando ao switch...</p>
+    <small>Isso pode levar alguns segundos.</small>
+  </div>
+</div>
+{% endblock %}

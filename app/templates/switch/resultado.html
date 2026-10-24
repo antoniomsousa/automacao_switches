@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if sucesso %}
+<section class="status status-sucesso" data-status="sucesso">
+  <svg class="status-icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-2 15-5-5 1.4-1.4 3.6 3.6 7.6-7.6L19 8l-9 9Z"/></svg>
+  <div>
+    <h1>Operação concluída</h1>
+    <p>{{ mensagem }}</p>
+    {% if ip %}<small>Switch {{ ip }} · {{ acao_titulo }}</small>{% endif %}
+  </div>
+</section>
+
+<section class="card terminal-card">
+  <div class="terminal-topo">
+    <h2>1. Comandos aplicados</h2>
+    <button type="button" class="copiar" data-copiar="cmd-comandos">Copiar</button>
+  </div>
+  <pre id="cmd-comandos" class="terminal">{{ execucao.comandos | join('\n') }}</pre>
+</section>
+
+<section class="card terminal-card">
+  <div class="terminal-topo">
+    <h2>2. Saída do switch</h2>
+    <button type="button" class="copiar" data-copiar="cmd-saida">Copiar</button>
+  </div>
+  <pre id="cmd-saida" class="terminal">{{ execucao.saida }}</pre>
+</section>
+
+<section class="card terminal-card">
+  <div class="terminal-topo">
+    <h2>3. Configuração no switch <code>{{ execucao.verificacao_cmd }}</code></h2>
+    <button type="button" class="copiar" data-copiar="cmd-verificacao">Copiar</button>
+  </div>
+  <pre id="cmd-verificacao" class="terminal">{{ execucao.verificacao }}</pre>
+</section>
+{% else %}
+<section class="status status-erro" data-status="erro">
+  <svg class="status-icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
+  <div>
+    <h1>Não foi possível concluir</h1>
+    <p>{{ mensagem }}</p>
+  </div>
+</section>
+{% endif %}
+
+<div class="linha-botoes">
+  <a class="botao botao-primario" href="{{ url_for('switch.formulario') }}">Voltar</a>
+</div>
+{% endblock %}
