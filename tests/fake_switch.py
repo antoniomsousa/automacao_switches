@@ -13,9 +13,25 @@ import copy
 import re
 import threading
 import time
+import types
 
+import fakenos.core.servers as fakenos_servers
+import fakenos.plugins.servers.ssh_server_paramiko as fakenos_ssh
 from fakenos import FakeNOS
 from fakenos.plugins.shell.cmd_shell import CMDShell
+
+
+class _ThreadDaemon(threading.Thread):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("daemon", True)
+        super().__init__(*args, **kwargs)
+
+
+# After a rejected login FakeNOS leaves its connection thread waiting forever; as a non-daemon
+# thread it keeps Python from exiting (the CI job hung after the tests). Make its threads daemon.
+_threading_daemon = types.SimpleNamespace(**{**vars(threading), "Thread": _ThreadDaemon})
+fakenos_servers.threading = _threading_daemon
+fakenos_ssh.threading = _threading_daemon
 
 HOST = "127.0.0.1"
 PORT = 6000
