@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 
 from netmiko import ConnectHandler
-from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
+from netmiko.exceptions import ConfigInvalidException, NetmikoAuthenticationException, NetmikoTimeoutException
+
+# IOS error messages after a rejected config command
+ERRO_IOS = r"^% (Invalid input|Incomplete command|Ambiguous command)|not allowed"
 
 
 class SwitchError(Exception):
@@ -48,16 +51,23 @@ class Switch:
     def _execucao(self, comandos, saida, verificacao_cmd):
         return Execucao(comandos, saida, verificacao_cmd, self.conn.send_command(verificacao_cmd))
 
+    def _configura(self, comandos, **kwargs):
+        """send_config_set, raising SwitchError if the switch rejects a command."""
+        try:
+            return self.conn.send_config_set(comandos, error_pattern=ERRO_IOS, **kwargs)
+        except ConfigInvalidException as e:
+            raise SwitchError("O switch rejeitou o comando: %s" % e)
+
     def criar_vlan(self, vlan_id, vlan_name):
         comandos = ["vlan %s" % vlan_id, "name %s" % vlan_name]
-        saida = self.conn.send_config_set(comandos)
+        saida = self._configura(comandos)
         # send_config_set wraps the commands in configure terminal / end
         return self._execucao(["configure terminal", *comandos, "end"], saida, "show vlan id %s" % vlan_id)
 
     def alterar_hostname(self, hostname):
         comandos = ["hostname %s" % hostname]
         # The prompt changes with the hostname, so skip command echo verification and re-read the prompt
-        saida = self.conn.send_config_set(comandos, cmd_verify=False)
+        saida = self._configura(comandos, cmd_verify=False)
         self.conn.set_base_prompt()
         return self._execucao(["configure terminal", *comandos, "end"], saida, "show running-config | include hostname")
 

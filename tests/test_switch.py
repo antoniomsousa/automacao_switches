@@ -1,4 +1,5 @@
 """Tests of every app action against the fake switch, through the Flask test client."""
+from tests import fake_switch
 
 SUCESSO = 'data-status="sucesso"'
 
@@ -34,6 +35,18 @@ def test_criar_vlan(client, acesso, switch_fake):
     assert "(config-vlan)#" in corpo
     assert "show vlan id 10" in corpo
     assert "10   USUARIOS" in corpo
+
+
+def test_criar_vlan_rejeitada(client, acesso, switch_fake, monkeypatch):
+    # Device without VLAN support (e.g. a router image) answers "% Invalid input" to "vlan <id>"
+    executa = switch_fake._executa
+    monkeypatch.setattr(switch_fake, "_executa",
+                        lambda self, line: fake_switch.INVALID if line.startswith("vlan ") else executa(self, line))
+    r = post(client, acesso, acao="criar_vlan", vlan_id="20", vlan_name="USUARIOS")
+    corpo = r.get_data(as_text=True)
+    assert SUCESSO not in corpo
+    assert "rejeitou o comando" in corpo
+    assert 20 not in switch_fake.state["vlans"]
 
 
 def test_alterar_hostname(client, acesso, switch_fake):
