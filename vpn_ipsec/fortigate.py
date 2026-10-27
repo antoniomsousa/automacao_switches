@@ -114,13 +114,17 @@ class FortiGate:
             raise FortiGateError("%s %s -> HTTP %d: %s" % (method, path, r.status_code, r.text[:300]))
         return r.json()
 
+    @staticmethod
+    def _cmdb(path, mkey=None):
+        return "cmdb/%s" % path if mkey is None else "cmdb/%s/%s" % (path, mkey)
+
     def find(self, obj):
         """Current object on the device, or None."""
         if "key" in obj:
-            body = self._request("GET", "cmdb/%s/%s" % (obj["path"], obj["key"]))
+            body = self._request("GET", self._cmdb(obj["path"], obj["key"]))
         else:
             field = obj["match"]
-            body = self._request("GET", "cmdb/%s" % obj["path"], params={"filter": "%s==%s" % (field, obj["data"][field])})
+            body = self._request("GET", self._cmdb(obj["path"]), params={"filter": "%s==%s" % (field, obj["data"][field])})
         results = (body or {}).get("results") or []
         return results[0] if results else None
 
@@ -130,19 +134,19 @@ class FortiGate:
         if current is None:
             if obj.get("update_only"):
                 raise FortiGateError("%s %s does not exist" % (obj["path"], obj["key"]))
-            self._request("POST", "cmdb/%s" % obj["path"], json=obj["data"])
+            self._request("POST", self._cmdb(obj["path"]), json=obj["data"])
             return "created"
         if not differences(current, obj["data"]):
             return "unchanged"
         mkey = obj.get("key") or current[obj["id"]]
-        self._request("PUT", "cmdb/%s/%s" % (obj["path"], mkey), json=obj["data"])
+        self._request("PUT", self._cmdb(obj["path"], mkey), json=obj["data"])
         return "updated"
 
     def delete(self, obj):
         current = self.find(obj)
         if current is not None and not obj.get("update_only"):
             mkey = obj.get("key") or current[obj["id"]]
-            self._request("DELETE", "cmdb/%s/%s" % (obj["path"], mkey))
+            self._request("DELETE", self._cmdb(obj["path"], mkey))
 
     def backup(self):
         """Full configuration as text (kept by the deploy script before any change)."""

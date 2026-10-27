@@ -10,6 +10,7 @@ Checks, in order (each one isolates a different layer):
 Exits 1 and sends an alert (vpn_ipsec.alerts) if any check fails.
 """
 import argparse
+import ipaddress
 import logging
 import platform
 import re
@@ -22,19 +23,27 @@ from vpn_ipsec.alerts import send_alert
 from vpn_ipsec.params import DEFAULT_PATH, load
 
 
+def ip_address(value):
+    """The value as a normalized IP address; anything else (e.g. "-f" read as a ping option) is rejected."""
+    try:
+        return str(ipaddress.ip_address(value.strip()))
+    except ValueError:
+        raise argparse.ArgumentTypeError("not an IP address: %r" % value) from None
+
+
 def ping(host, count=4, timeout=2):
     """(packet loss %, average RTT ms or None) using the system ping."""
     windows = platform.system() == "Windows"
-    cmd = ["ping", "-n" if windows else "-c", str(count), "-w" if windows else "-W",
-           str(timeout * 1000 if windows else timeout), host]
+    cmd = ["ping", "-n" if windows else "-c", str(int(count)), "-w" if windows else "-W",
+           str(timeout * 1000 if windows else timeout), ip_address(host)]
     out = subprocess.run(cmd, capture_output=True, text=True, timeout=count * (timeout + 1) + 5).stdout
     return parse_ping(out)
 
 
 def parse_ping(output):
-    # Linux: "4 packets transmitted, 4 received, 0% packet loss" / "rtt min/avg/max/mdev = 1.1/2.2/3.3/0.4 ms"
-    # Windows: "(0% loss)" or "(0% de perda)" / "Average = 2ms" or "Média = 2ms"
-    loss = re.search(r"(\d+(?:\.\d+)?)% (?:packet )?(?:loss|perda|de perda)", output)
+    # Loss is printed as "0% packet loss" on Linux and "0% loss" or "0% de perda" on Windows (English or
+    # Portuguese); the average RTT as the second value of "min/avg/max/mdev" on Linux, "Average" or "Média" on Windows
+    loss = re.search(r"(?<![\d.])(\d+(?:\.\d+)?)% (?:packet loss|loss|de perda|perda)", output)
     avg = re.search(r"= [\d.]+/([\d.]+)/", output) or re.search(r"(?:Average|M[ée]dia) = (\d+)ms", output)
     return (float(loss.group(1)) if loss else 100.0), (float(avg.group(1)) if avg else None)
 
@@ -56,7 +65,7 @@ def build_checks(p, site, remote_hosts, tcp_targets):
     checks += [("ping", h, "remote LAN host") for h in remote_hosts]
     for target in tcp_targets:
         host, _, port = target.rpartition(":")
-        checks.append(("tcp", (host, int(port)), "TCP %s" % target))
+        checks.append(("tcp", (ip_address(host), int(port)), "TCP %s" % target))
     return checks
 
 
@@ -81,8 +90,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--site", choices=["fortigate", "paloalto"], required=True,
                         help="side of the tunnel this host is on")
-    parser.add_argument("--remote-host", action="append", default=[], help="host in the remote LAN to ping (repeatable)")
-    parser.add_argument("--tcp", action="append", default=[], metavar="HOST:PORT", help="TCP port to test (repeatable)")
+    parser.add_argument("--remote-host", action="append", default=[], type=ip_address,
+                        help="IP of a host in the remote LAN to ping (repeatable)")
+    parser.add_argument("--tcp", action="append", default=[], metavar="IP:PORT", help="TCP port to test (repeatable)")
     parser.add_argument("--count", type=int, default=4, help="pings per target")
     parser.add_argument("--max-loss", type=float, default=25.0, help="highest acceptable packet loss %%")
     parser.add_argument("--params", default=DEFAULT_PATH)

@@ -25,8 +25,18 @@ class ParamsError(Exception):
         self.errors = errors
 
 
+def safe_path(path):
+    """Resolved path of a params file: a .yaml/.yml inside the package folder or the current directory."""
+    resolved = Path(path).resolve()
+    allowed = (DEFAULT_PATH.parent.resolve(), Path.cwd().resolve())
+    if resolved.suffix not in (".yaml", ".yml") or not any(resolved.is_relative_to(base) for base in allowed):
+        raise ParamsError(["params file must be a .yaml/.yml inside %s or the current directory: %s"
+                           % (DEFAULT_PATH.parent, path)])
+    return resolved
+
+
 def load(path=DEFAULT_PATH):
-    with open(path, encoding="utf-8") as f:
+    with open(safe_path(path), encoding="utf-8") as f:
         params = yaml.safe_load(f)
     validate(params)
     return params

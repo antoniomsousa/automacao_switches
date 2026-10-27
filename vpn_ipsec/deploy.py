@@ -14,8 +14,6 @@ import sys
 import time
 from datetime import datetime
 
-import requests
-
 from vpn_ipsec import fortigate, paloalto
 from vpn_ipsec.alerts import send_alert
 from vpn_ipsec.params import DEFAULT_PATH, ParamsError, load, read_psk
@@ -93,16 +91,16 @@ def rollback(fgt, pan, created, snapshot, committed):
     for obj in reversed(created):
         try:
             fgt.delete(obj)
-        except fortigate.FortiGateError as e:
-            log.error("rollback FortiGate %s: %s", obj["path"], e)
+        except fortigate.FortiGateError:
+            log.exception("rollback FortiGate %s", obj["path"])
     try:
         if committed:
             pan.load_snapshot(snapshot)
             pan.commit()
         else:
             pan.revert_candidate()
-    except paloalto.PaloAltoError as e:
-        log.error("rollback Palo Alto: %s", e)
+    except paloalto.PaloAltoError:
+        log.exception("rollback Palo Alto")
 
 
 def validate(p, fgt, pan, wait_up=0, objects=None):
@@ -157,7 +155,7 @@ def main(argv=None):
         for error in e.errors:
             log.error(error)
         return 2
-    except (fortigate.FortiGateError, paloalto.PaloAltoError, requests.RequestException, OSError) as e:
+    except (fortigate.FortiGateError, paloalto.PaloAltoError, OSError) as e:  # requests errors are OSError
         send_alert("VPN: could not reach the firewalls", [str(e)])
         return 1
     if problems:

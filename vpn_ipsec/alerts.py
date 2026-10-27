@@ -17,7 +17,7 @@ def send_alert(title, details, session=None):
     try:
         (session or requests).post(url, json={"text": "\n".join(lines)}, timeout=10).raise_for_status()
         return True
-    except requests.RequestException as e:
+    except requests.RequestException:
         # A broken webhook must not hide the original failure
-        log.error("could not send the alert to the webhook: %s", e)
+        log.exception("could not send the alert to the webhook")
         return False

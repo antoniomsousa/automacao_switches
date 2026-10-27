@@ -9,6 +9,8 @@ from app.models.validation import RESERVED_VLANS
 
 # IOS error messages after a rejected config command
 IOS_ERROR = r"^% (Invalid input|Incomplete command|Ambiguous command)|not allowed"
+SHOW_VLANS = "show vlan brief"
+SHOW_HOSTNAME = "show running-config | include ^hostname"
 
 
 class SwitchError(Exception):
@@ -73,7 +75,7 @@ class Switch:
         commands = [command for vlan_id, vlan_name in vlans for command in ("vlan %s" % vlan_id, "name %s" % vlan_name)]
         output = self._configure(commands)
         # send_config_set wraps the commands in configure terminal / end
-        execution = self._execution(["configure terminal", *commands, "end"], output, "show vlan brief")
+        execution = self._execution(["configure terminal", *commands, "end"], output, SHOW_VLANS)
         execution.checks = [compliance.vlan_check(execution.verification, vlan_id, vlan_name) for vlan_id, vlan_name in vlans]
         return execution
 
@@ -82,8 +84,7 @@ class Switch:
         # The prompt changes with the hostname, so skip command echo verification and re-read the prompt
         output = self._configure(commands, cmd_verify=False)
         self.conn.set_base_prompt()
-        execution = self._execution(["configure terminal", *commands, "end"], output,
-                                    "show running-config | include ^hostname")
+        execution = self._execution(["configure terminal", *commands, "end"], output, SHOW_HOSTNAME)
         execution.checks = [compliance.hostname_check(execution.verification, hostname)]
         return execution
 
@@ -93,9 +94,8 @@ class Switch:
 
     def check_standard(self):
         """Compare the switch with the standard configuration (VLANs 10/20/50 and hostname); changes nothing."""
-        vlans = self.conn.send_command("show vlan brief")
-        hostname_cmd = "show running-config | include ^hostname"
-        execution = Execution(["show vlan brief", hostname_cmd], vlans, hostname_cmd, self.conn.send_command(hostname_cmd))
+        vlans = self.conn.send_command(SHOW_VLANS)
+        execution = Execution([SHOW_VLANS, SHOW_HOSTNAME], vlans, SHOW_HOSTNAME, self.conn.send_command(SHOW_HOSTNAME))
         execution.checks = compliance.standard_checks(vlans, execution.verification)
         return execution
 
@@ -108,7 +108,7 @@ class Switch:
     def _with_vlans(self, config):
         """In VTP server/client mode IOS keeps VLANs in vlan.dat, not in the running-config:
         add the ones from show vlan brief that the config doesn't already have."""
-        brief = self.conn.send_command("show vlan brief")
+        brief = self.conn.send_command(SHOW_VLANS)
         in_config = {int(i) for i in re.findall(r"^vlan (\d+)$", config, re.M)}
         missing = [(i, name) for i, name in compliance.parse_vlans(brief).items()
                    if i not in RESERVED_VLANS and i not in in_config]

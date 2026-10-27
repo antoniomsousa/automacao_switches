@@ -36,6 +36,47 @@ def form_page():
     return render_template("switch/form.html")
 
 
+def validate_input(action, form):
+    """(error, vlans, converted): the form checked before opening the SSH session."""
+    vlans, converted = [], []
+    error = validate_port(form.get("port", "").strip() or "22")
+    if not error and action == "create_vlan":
+        vlans, converted, error = validate_vlan_list(form.getlist("vlan_id"), form.getlist("vlan_name"))
+    elif not error and action == "hostname":
+        error = validate_hostname(form.get("hostname", "").strip())
+    return error, vlans, converted
+
+
+def vlans_message(vlans, converted):
+    created = ", ".join("%s (%s)" % vlan for vlan in vlans)
+    if len(vlans) == 1:
+        message = "VLAN %s criada com sucesso." % created
+    else:
+        message = "%d VLANs criadas com sucesso: %s." % (len(vlans), created)
+    message += " Lembre de salvar a configuração."
+    for typed, name in converted:
+        message += " O nome %s foi convertido para %s (ASCII, sem acentos)." % (typed, name)
+    return message
+
+
+def backup_response(sw):
+    switch_name, config = sw.running_config()
+    filename = "%s_%s.cfg" % (switch_name, datetime.now().strftime("%Y%m%d_%H%M%S"))
+    return Response(config, mimetype="text/plain", headers={"Content-Disposition": "attachment; filename=%s" % filename})
+
+
+def run_action(sw, action, form, vlans, converted):
+    """(execution, message) for every action except backup."""
+    if action == "create_vlan":
+        return sw.create_vlans(vlans), vlans_message(vlans, converted)
+    if action == "hostname":
+        hostname = form.get("hostname", "").strip()
+        return sw.change_hostname(hostname), "Hostname alterado para %s. Lembre de salvar a configuração." % hostname
+    if action == "validate":
+        return sw.check_standard(), "O switch está com a configuração padrão (VLANs 10, 20, 50 e hostname)."
+    return sw.save_config(), "Configuração salva na NVRAM (startup-config)."
+
+
 @bp.route("/switch", methods=["POST"])
 def execute():
     form = request.form
@@ -43,44 +84,16 @@ def execute():
     if action not in ACTIONS:
         return error_result("Ação inválida.")
 
-    hostname = form.get("hostname", "").strip()
-    port = form.get("port", "").strip() or "22"
-
-    # Validate input before opening the SSH session
-    error = validate_port(port)
-    if not error and action == "create_vlan":
-        vlans, converted, error = validate_vlan_list(form.getlist("vlan_id"), form.getlist("vlan_name"))
-    elif not error and action == "hostname":
-        error = validate_hostname(hostname)
+    error, vlans, converted = validate_input(action, form)
     if error:
         return error_result(error)
 
+    port = int(form.get("port", "").strip() or "22")
     try:
-        with Switch(form["ip"], form["username"], form["password"], int(port), form.get("secret", "")) as sw:
+        with Switch(form["ip"], form["username"], form["password"], port, form.get("secret", "")) as sw:
             if action == "backup":
-                switch_name, config = sw.running_config()
-                filename = "%s_%s.cfg" % (switch_name, datetime.now().strftime("%Y%m%d_%H%M%S"))
-                return Response(config, mimetype="text/plain",
-                                headers={"Content-Disposition": "attachment; filename=%s" % filename})
-            if action == "create_vlan":
-                execution = sw.create_vlans(vlans)
-                created = ", ".join("%s (%s)" % vlan for vlan in vlans)
-                if len(vlans) == 1:
-                    message = "VLAN %s criada com sucesso." % created
-                else:
-                    message = "%d VLANs criadas com sucesso: %s." % (len(vlans), created)
-                message += " Lembre de salvar a configuração."
-                for typed, name in converted:
-                    message += " O nome %s foi convertido para %s (ASCII, sem acentos)." % (typed, name)
-            elif action == "hostname":
-                execution = sw.change_hostname(hostname)
-                message = "Hostname alterado para %s. Lembre de salvar a configuração." % hostname
-            elif action == "validate":
-                execution = sw.check_standard()
-                message = "O switch está com a configuração padrão (VLANs 10, 20, 50 e hostname)."
-            else:
-                execution = sw.save_config()
-                message = "Configuração salva na NVRAM (startup-config)."
+                return backup_response(sw)
+            execution, message = run_action(sw, action, form, vlans, converted)
     except SwitchError as e:
         return error_result(str(e))
     except Exception as e:

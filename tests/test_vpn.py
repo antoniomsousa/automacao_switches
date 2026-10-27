@@ -1,4 +1,5 @@
 """Part 2: VPN parameters, the FortiGate/Palo Alto automation (against in-memory APIs) and the connectivity test."""
+import argparse
 import copy
 
 import pytest
@@ -219,3 +220,33 @@ def test_connectivity_main(monkeypatch, caplog, capsys):
 
     monkeypatch.setattr(connectivity_test, "ping", lambda host, count: (0.0, 3.0))
     assert connectivity_test.main(["--site", "fortigate", "--remote-host", "10.20.0.10"]) == 0
+
+
+@pytest.mark.parametrize("value", ["-f", "10.20.0.10; rm -rf /", "host.example", "999.1.1.1"])
+def test_connectivity_rejects_non_ip_targets(value):
+    # Only an IP reaches the ping arguments: "-f" would otherwise be read as a ping option
+    with pytest.raises(argparse.ArgumentTypeError):
+        connectivity_test.ip_address(value)
+    with pytest.raises(SystemExit):
+        connectivity_test.main(["--site", "fortigate", "--remote-host", value])
+
+
+def test_ping_passes_normalized_ip(monkeypatch):
+    calls = []
+    monkeypatch.setattr(connectivity_test.subprocess, "run",
+                        lambda cmd, **kw: calls.append(cmd) or type("R", (), {"stdout": "0% packet loss"})())
+    assert connectivity_test.ping(" 10.20.0.10 ", count=1) == (0.0, None)
+    assert calls[0][-1] == "10.20.0.10"
+
+
+@pytest.mark.parametrize("path", ["../../etc/passwd", "params.txt", "/tmp/params.yaml"])
+def test_params_path_must_be_local_yaml(path, monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(params.ParamsError):
+        params.load(path)
+
+
+def test_params_from_current_directory(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "lab.yaml").write_text(params.DEFAULT_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    assert params.load("lab.yaml")["vpn_name"] == "FGT-PA"
