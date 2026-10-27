@@ -2,6 +2,7 @@
 
 {% block content %}
 <form id="form-switch" class="painel" action="{{ url_for('switch.executar') }}" method="post" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <section class="card secao conexao">
     <div class="card-ilustracao">

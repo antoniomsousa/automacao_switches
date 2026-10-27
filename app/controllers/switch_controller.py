@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from flask import Blueprint, redirect, render_template, request, Response, url_for
+from flask_wtf.csrf import CSRFError
 
 from app.models.switch import Switch, SwitchError
 from app.models.validacao import valida_hostname, valida_porta, valida_vlan
@@ -19,7 +20,12 @@ def resultado_erro(mensagem):
     return render_template("switch/resultado.html", sucesso=False, mensagem=mensagem)
 
 
-@bp.route("/")
+@bp.app_errorhandler(CSRFError)
+def csrf_invalido(e):
+    return resultado_erro("Formulário expirado ou inválido. Recarregue a página e tente novamente."), 400
+
+
+@bp.route("/", methods=["GET"])
 def home():
     return redirect(url_for("switch.formulario"))
 

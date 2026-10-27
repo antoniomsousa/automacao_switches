@@ -31,7 +31,10 @@ def switch_fake(porta_switch):
 
 @pytest.fixture
 def client():
-    return create_app().test_client()
+    app = create_app()
+    # CSRF has its own tests (test_csrf.py); the rest post the form directly
+    app.config["WTF_CSRF_ENABLED"] = False
+    return app.test_client()
 
 
 @pytest.fixture

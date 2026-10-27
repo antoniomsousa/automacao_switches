@@ -4,7 +4,7 @@ var RESERVED_VLANS = [1, 1002, 1003, 1004, 1005];
 var VALIDACOES = {
     vlan_id: function (v) {
         if (!/^\d+$/.test(v) || +v < 1 || +v > 4094) return "VLAN ID deve ser um número entre 1 e 4094.";
-        if (RESERVED_VLANS.indexOf(+v) !== -1) return "VLAN " + v + " é reservada e não pode ser criada.";
+        if (RESERVED_VLANS.includes(+v)) return "VLAN " + v + " é reservada e não pode ser criada.";
     },
     vlan_name: function (v) {
         if (!/^[A-Za-z0-9_-]{1,32}$/.test(v)) return "1-32 caracteres: letras, números, _ ou -, sem espaços.";
@@ -102,7 +102,7 @@ if (form) {
     });
 
     form.addEventListener("submit", function (e) {
-        var acao = e.submitter && e.submitter.value;
+        var acao = e.submitter?.value;
         lembrar(form);
         if (acao === "backup") {
             // A download doesn't leave the page, so only flag the button for a moment
@@ -132,15 +132,10 @@ document.querySelectorAll("[data-copiar]").forEach(function (botao) {
             botao.textContent = "Copiado!";
             setTimeout(function () { botao.textContent = "Copiar"; }, 1500);
         };
-        if (navigator.clipboard) navigator.clipboard.writeText(texto).then(feito);
-        else {
-            var area = document.createElement("textarea");
-            area.value = texto;
-            document.body.appendChild(area);
-            area.select();
-            document.execCommand("copy");
-            area.remove();
-            feito();
-        }
+        // The app runs on 127.0.0.1 (a secure context), so the Clipboard API is available
+        navigator.clipboard.writeText(texto).then(feito).catch(function () {
+            botao.textContent = "Erro ao copiar";
+            setTimeout(function () { botao.textContent = "Copiar"; }, 1500);
+        });
     });
 });

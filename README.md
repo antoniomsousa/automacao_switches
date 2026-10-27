@@ -32,6 +32,7 @@ tests/
   conftest.py                       Fixtures do pytest
   test_switch.py                    Testes das ações contra o switch simulado
   test_validacao.py                 Testes das regras de validação
+  test_csrf.py                      Testes da proteção CSRF
 run.py                              Ponto de entrada
 ```
 
@@ -50,6 +51,8 @@ python run.py
 ```
 
 Abra http://127.0.0.1:5000 e informe IP, porta SSH, usuário e senha do switch.
+
+O formulário tem proteção CSRF (Flask-WTF). A chave da sessão é aleatória a cada execução; para mantê-la entre reinícios, defina a variável de ambiente `SECRET_KEY`.
 
 ## Testes sem switch real
 
