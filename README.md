@@ -2,67 +2,71 @@
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=antoniomsousa_automacao_switches&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=antoniomsousa_automacao_switches)
 
-Frontend web (Flask) para configurar switches Cisco IOS via SSH (Netmiko):
+Web frontend (Flask) to configure Cisco IOS switches over SSH (Netmiko):
 
-- Criar VLAN (ID + nome)
-- Alterar hostname
-- Salvar a configuração na NVRAM (`write memory`)
-- Baixar backup da running-config
+- Create a VLAN (ID + name)
+- Change the hostname
+- Save the configuration to NVRAM (`write memory`)
+- Download a backup of the running-config (includes the VLANs from `vlan.dat`)
 
-## Estrutura (MVC)
+The interface is in Brazilian Portuguese.
+
+![Switch Wizard screen](docs/FE_FUNC.png)
+
+## Structure (MVC)
 
 ```
 app/
-  __init__.py                       create_app(): cria o Flask e registra os blueprints
+  __init__.py                       create_app(): creates the Flask app and registers the blueprints
   models/
-    switch.py                       Model: classe Switch (sessão SSH e comandos no switch)
-    validacao.py                    Model: regras de VLAN, hostname e porta
+    switch.py                       Model: Switch class (SSH session and commands on the switch)
+    validation.py                   Model: VLAN, hostname and port rules
   controllers/
-    switch_controller.py            Controller: rotas / e /switch
+    switch_controller.py            Controller: / and /switch routes
   templates/
-    base.html                       View: layout (cabeçalho com logos, rodapé)
-    switch/form.html                View: formulário
-    switch/resultado.html           View: resultado / erro
+    base.html                       View: layout (header with logos, footer)
+    switch/form.html                View: form
+    switch/result.html              View: result / error
   static/
-    css/style.css                   Visual (cores Mercado Livre)
-    js/app.js                       Validação no navegador, tela de carregamento, copiar
-    img/switch-automation.svg       Logo do Switch Wizard
+    css/style.css                   Styling (Mercado Livre colors)
+    js/app.js                       Browser-side validation, loading screen, copy buttons
+    img/switch-automation.svg       Switch Wizard logo
 tests/
-  fake_switch.py                    Switch Cisco IOS simulado (FakeNOS)
-  conftest.py                       Fixtures do pytest
-  test_switch.py                    Testes das ações contra o switch simulado
-  test_validacao.py                 Testes das regras de validação
-  test_csrf.py                      Testes da proteção CSRF
-run.py                              Ponto de entrada
+  fake_switch.py                    Simulated Cisco IOS switch (FakeNOS)
+  conftest.py                       pytest fixtures
+  test_switch.py                    Tests of the actions against the simulated switch
+  test_validation.py                Tests of the validation rules
+  test_csrf.py                      Tests of the CSRF protection
+run.py                              Entry point
 ```
 
 
-## Instalação
+## Installation
 
 ```
-pip install -r requirements.txt          # para rodar
-pip install -r requirements-dev.txt      # para rodar + testar
+pip install -r requirements.txt          # to run
+pip install -r requirements-dev.txt      # to run + test
 ```
 
-## Uso
+## Usage
 
 ```
 python run.py
 ```
 
-Abra http://127.0.0.1:5000 e informe IP, porta SSH, usuário e senha do switch.
+Open http://127.0.0.1:5000 and enter the switch's IP, SSH port, username and password.
 
-O formulário tem proteção CSRF (Flask-WTF). A chave da sessão é aleatória a cada execução; para mantê-la entre reinícios, defina a variável de ambiente `SECRET_KEY`.
+The form is protected against CSRF (Flask-WTF). The session key is random on every start; to keep it across restarts, set the `SECRET_KEY` environment variable.
 
-## Testes sem switch real
+## Testing without a real switch
 
-Switch simulado em `127.0.0.1:6000` (usuário `admin` / senha `admin`), para testar pelo navegador:
+Simulated switch on `127.0.0.1:6000` (user `admin` / password `admin`), to test from the browser:
 
 ```
 python -m tests.fake_switch
 ```
 
-Testes automatizados (sobem o próprio switch simulado numa porta livre):
+Automated tests (they start their own simulated switch on a free port):
 
 ```
 python -m pytest

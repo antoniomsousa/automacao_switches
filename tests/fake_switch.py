@@ -39,58 +39,59 @@ USERNAME = "admin"
 PASSWORD = "admin"
 
 INVALID = "% Invalid input detected at '^' marker."
-ESTADO_INICIAL = {"hostname": "SW-LAB", "vlans": {1: "default"}}
+INITIAL_STATE = {"hostname": "SW-LAB", "vlans": {1: "default", 1002: "fddi-default", 1003: "token-ring-default",
+                                                  1004: "fddinet-default", 1005: "trnet-default"}}
 
 
 class SwitchShell(CMDShell):
     # Shared by every SSH session, so changes survive between the app's connections
-    state = copy.deepcopy(ESTADO_INICIAL)
-    startup = copy.deepcopy(ESTADO_INICIAL)
+    state = copy.deepcopy(INITIAL_STATE)
+    startup = copy.deepcopy(INITIAL_STATE)
     lock = threading.Lock()
 
     @classmethod
     def reset(cls):
-        cls.state = copy.deepcopy(ESTADO_INICIAL)
-        cls.startup = copy.deepcopy(ESTADO_INICIAL)
+        cls.state = copy.deepcopy(INITIAL_STATE)
+        cls.startup = copy.deepcopy(INITIAL_STATE)
 
     def __init__(self, *args, **kwargs):
         kwargs["base_prompt"] = self.state["hostname"]
         super().__init__(*args, **kwargs)
         # Logged-in user has privilege 15, like most switches: start in enable mode
-        self.modo = "exec"
-        self.vlan_editando = None
+        self.mode = "exec"
+        self.editing_vlan = None
         self._set_prompt()
 
     def _set_prompt(self):
         self.base_prompt = self.state["hostname"]
-        sufixo = {"exec": "#", "config": "(config)#", "config-vlan": "(config-vlan)#"}[self.modo]
-        self.prompt = self.base_prompt + sufixo
+        suffix = {"exec": "#", "config": "(config)#", "config-vlan": "(config-vlan)#"}[self.mode]
+        self.prompt = self.base_prompt + suffix
 
     def default(self, line):
         line = " ".join(line.split())
         with self.lock:
-            resultado = self._executa(line)
-        if resultado is True:
+            result = self._execute(line)
+        if result is True:
             return True
         self._set_prompt()
-        if resultado:
-            self.writeline(resultado)
+        if result:
+            self.writeline(result)
         return False
 
-    def _executa(self, line):
+    def _execute(self, line):
         if line in ("terminal length 0", "terminal width 511", "enable"):
             return None
 
-        if self.modo == "exec":
+        if self.mode == "exec":
             if "|" in line:
-                comando, _, filtro = line.partition("|")
-                m = re.fullmatch(r"\s*include (.+)", filtro)
+                command, _, filter_ = line.partition("|")
+                m = re.fullmatch(r"\s*include (.+)", filter_)
                 if not m:
                     return INVALID
-                saida = self._executa(comando.strip())
-                return "\n".join(l for l in saida.splitlines() if re.search(m.group(1), l))
+                output = self._execute(command.strip())
+                return "\n".join(l for l in output.splitlines() if re.search(m.group(1), l))
             if line in ("configure terminal", "conf t"):
-                self.modo = "config"
+                self.mode = "config"
                 return "Enter configuration commands, one per line.  End with CNTL/Z."
             if line in ("write mem", "write memory", "wr", "copy running-config startup-config"):
                 SwitchShell.startup = copy.deepcopy(self.state)
@@ -113,10 +114,10 @@ class SwitchShell(CMDShell):
 
         # config / config-vlan
         if line == "end":
-            self.modo = "exec"
+            self.mode = "exec"
             return None
         if line == "exit":
-            self.modo = "config" if self.modo == "config-vlan" else "exec"
+            self.mode = "config" if self.mode == "config-vlan" else "exec"
             return None
 
         m = re.fullmatch(r"vlan (\d+)", line)
@@ -125,8 +126,8 @@ class SwitchShell(CMDShell):
             if not 1 <= vlan_id <= 4094:
                 return INVALID
             self.state["vlans"].setdefault(vlan_id, "VLAN%04d" % vlan_id)
-            self.vlan_editando = vlan_id
-            self.modo = "config-vlan"
+            self.editing_vlan = vlan_id
+            self.mode = "config-vlan"
             return None
 
         m = re.fullmatch(r"no vlan (\d+)", line)
@@ -137,46 +138,43 @@ class SwitchShell(CMDShell):
         m = re.fullmatch(r"hostname (\S+)", line)
         if m:
             self.state["hostname"] = m.group(1)
-            self.modo = "config"
+            self.mode = "config"
             return None
 
         m = re.fullmatch(r"name (\S+)", line)
-        if m and self.modo == "config-vlan":
-            self.state["vlans"][self.vlan_editando] = m.group(1)
+        if m and self.mode == "config-vlan":
+            self.state["vlans"][self.editing_vlan] = m.group(1)
             return None
 
         return INVALID
 
     def _render_vlans(self, ids=None):
-        linhas = ["VLAN Name                             Status    Ports",
+        lines = ["VLAN Name                             Status    Ports",
                   "---- -------------------------------- --------- -------------------------------"]
-        for vlan_id, nome in sorted(self.state["vlans"].items()):
+        for vlan_id, name in sorted(self.state["vlans"].items()):
             if ids is None or vlan_id in ids:
-                linhas.append("%-4d %-32s active" % (vlan_id, nome))
-        return "\n".join(linhas)
+                lines.append("%-4d %-32s active" % (vlan_id, name))
+        return "\n".join(lines)
 
     @staticmethod
     def _render_config(state):
-        linhas = ["Building configuration...", "", "Current configuration:", "!",
+        lines = ["Building configuration...", "", "Current configuration:", "!",
                   "version 15.2", "service timestamps log datetime msec", "!",
                   "hostname %s" % state["hostname"], "!"]
-        for vlan_id, nome in sorted(state["vlans"].items()):
-            if vlan_id == 1:
-                continue
-            linhas += ["vlan %d" % vlan_id, " name %s" % nome, "!"]
+        # Like a real switch in VTP server mode, VLANs live in vlan.dat and aren't listed here
         for i in range(1, 9):
-            linhas += ["interface GigabitEthernet0/%d" % i, " switchport mode access", "!"]
-        linhas += ["line vty 0 15", " login local", " transport input ssh", "!", "end"]
-        return "\n".join(linhas)
+            lines += ["interface GigabitEthernet0/%d" % i, " switchport mode access", "!"]
+        lines += ["line vty 0 15", " login local", " transport input ssh", "!", "end"]
+        return "\n".join(lines)
 
 
-def cria_switch(porta=PORT):
+def create_switch(port=PORT):
     inventory = {
         "hosts": {
             "SW-LAB": {
                 "username": USERNAME,
                 "password": PASSWORD,
-                "port": porta,
+                "port": port,
                 "platform": "cisco_ios",
                 "server": {"plugin": "ParamikoSshServer", "configuration": {"address": HOST, "timeout": 1}},
             }
@@ -189,7 +187,7 @@ def cria_switch(porta=PORT):
 
 
 if __name__ == "__main__":
-    net = cria_switch()
+    net = create_switch()
     net.start()
     print("Switch simulado rodando em %s:%d (usuário %s / senha %s). Ctrl+C para parar." % (HOST, PORT, USERNAME, PASSWORD))
     try:

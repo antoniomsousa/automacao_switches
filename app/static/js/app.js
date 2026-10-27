@@ -1,7 +1,7 @@
-// Client-side checks mirror app/models/validacao.py; the server validates again
+// Client-side checks mirror app/models/validation.py; the server validates again
 var RESERVED_VLANS = [1, 1002, 1003, 1004, 1005];
 
-var VALIDACOES = {
+var VALIDATIONS = {
     vlan_id: function (v) {
         if (!/^\d+$/.test(v) || +v < 1 || +v > 4094) return "VLAN ID deve ser um número entre 1 e 4094.";
         if (RESERVED_VLANS.includes(+v)) return "VLAN " + v + " é reservada e não pode ser criada.";
@@ -18,64 +18,64 @@ var VALIDACOES = {
     }
 };
 
-var MENSAGENS = {
-    criar_vlan: "Criando a VLAN no switch...",
+var MESSAGES = {
+    create_vlan: "Criando a VLAN no switch...",
     hostname: "Alterando o hostname...",
-    salvar: "Salvando a configuração na NVRAM..."
+    save: "Salvando a configuração na NVRAM..."
 };
 
-function marcaErro(input, mensagem) {
-    var erro = input.closest(".campo").querySelector(".erro-campo");
-    input.classList.toggle("invalido", !!mensagem);
-    if (erro) erro.textContent = mensagem || "";
+function markError(input, message) {
+    var error = input.closest(".field").querySelector(".field-error");
+    input.classList.toggle("invalid", !!message);
+    if (error) error.textContent = message || "";
 }
 
-function validaCampo(input) {
-    var valor = input.value.trim();
-    var regra = VALIDACOES[input.dataset.validar || input.name];
-    var mensagem = "";
-    if (input.required && !valor) mensagem = "Campo obrigatório.";
-    else if (regra && (valor || input.dataset.validar)) mensagem = regra(valor) || "";
-    marcaErro(input, mensagem);
-    return !mensagem;
+function validateField(input) {
+    var value = input.value.trim();
+    var rule = VALIDATIONS[input.dataset.validate || input.name];
+    var message = "";
+    if (input.required && !value) message = "Campo obrigatório.";
+    else if (rule && (value || input.dataset.validate)) message = rule(value) || "";
+    markError(input, message);
+    return !message;
 }
 
 // Connection section plus the section of the clicked button
-function validaSecoes(botao) {
-    var inputs = Array.prototype.slice.call(document.querySelectorAll(".conexao input"));
-    inputs = inputs.concat(Array.prototype.slice.call(botao.closest(".secao").querySelectorAll("input[data-validar]")));
-    var primeiroInvalido = null;
+function validateSections(button) {
+    var inputs = Array.prototype.slice.call(document.querySelectorAll(".connection input"));
+    inputs = inputs.concat(Array.prototype.slice.call(button.closest(".section").querySelectorAll("input[data-validate]")));
+    var firstInvalid = null;
     inputs.forEach(function (input) {
-        if (!validaCampo(input) && !primeiroInvalido) primeiroInvalido = input;
+        if (!validateField(input) && !firstInvalid) firstInvalid = input;
     });
-    if (primeiroInvalido) primeiroInvalido.focus();
-    return !primeiroInvalido;
+    if (firstInvalid) firstInvalid.focus();
+    return !firstInvalid;
 }
 
-function lembrar(form) {
+function remember(form) {
     try {
-        form.querySelectorAll("[data-lembrar]").forEach(function (input) {
+        form.querySelectorAll("[data-remember]").forEach(function (input) {
             localStorage.setItem("switch-wizard:" + input.name, input.value);
         });
     } catch (e) { /* storage unavailable: nothing to remember */ }
 }
 
-function restaurar(form) {
+function restore(form) {
     try {
-        form.querySelectorAll("[data-lembrar]").forEach(function (input) {
-            var valor = localStorage.getItem("switch-wizard:" + input.name);
-            if (valor) input.value = valor;
+        form.querySelectorAll("[data-remember]").forEach(function (input) {
+            var value = localStorage.getItem("switch-wizard:" + input.name);
+            if (value) input.value = value;
         });
     } catch (e) { /* storage unavailable */ }
 }
 
 var form = document.getElementById("form-switch");
 if (form) {
-    restaurar(form);
+    restore(form);
 
-    form.querySelectorAll("button[name=acao]").forEach(function (botao) {
-        botao.addEventListener("click", function (e) {
-            if (!validaSecoes(botao)) e.preventDefault();
+    form.querySelectorAll("button[name=action]").forEach(function (button) {
+        button.addEventListener("click", function (e) {
+            if (!validateSections(button)) e.preventDefault();
         });
     });
 
@@ -84,58 +84,58 @@ if (form) {
         input.addEventListener("keydown", function (e) {
             if (e.key !== "Enter") return;
             e.preventDefault();
-            var botao = input.closest(".secao").querySelector("button[name=acao]");
-            if (botao) botao.click();
+            var button = input.closest(".section").querySelector("button[name=action]");
+            if (button) button.click();
         });
         input.addEventListener("input", function () {
-            if (input.classList.contains("invalido")) validaCampo(input);
+            if (input.classList.contains("invalid")) validateField(input);
         });
     });
 
-    form.querySelectorAll(".mostrar-senha").forEach(function (botao) {
-        botao.addEventListener("click", function () {
-            var input = botao.parentNode.querySelector("input");
-            var mostrar = input.type === "password";
-            input.type = mostrar ? "text" : "password";
-            botao.textContent = mostrar ? "Ocultar" : "Mostrar";
+    form.querySelectorAll(".toggle-password").forEach(function (button) {
+        button.addEventListener("click", function () {
+            var input = button.parentNode.querySelector("input");
+            var show = input.type === "password";
+            input.type = show ? "text" : "password";
+            button.textContent = show ? "Ocultar" : "Mostrar";
         });
     });
 
     form.addEventListener("submit", function (e) {
-        var acao = e.submitter?.value;
-        lembrar(form);
-        if (acao === "backup") {
+        var action = e.submitter?.value;
+        remember(form);
+        if (action === "backup") {
             // A download doesn't leave the page, so only flag the button for a moment
-            var botao = e.submitter;
-            var texto = botao.innerHTML;
-            botao.textContent = "Gerando backup...";
-            setTimeout(function () { botao.disabled = true; }, 0);
-            setTimeout(function () { botao.innerHTML = texto; botao.disabled = false; }, 5000);
+            var button = e.submitter;
+            var text = button.innerHTML;
+            button.textContent = "Gerando backup...";
+            setTimeout(function () { button.disabled = true; }, 0);
+            setTimeout(function () { button.innerHTML = text; button.disabled = false; }, 5000);
             return;
         }
         var ip = form.querySelector("[name=ip]").value.trim();
-        document.getElementById("carregando-texto").textContent =
-            "Conectando em " + ip + ". " + (MENSAGENS[acao] || "");
-        document.getElementById("carregando").hidden = false;
+        document.getElementById("loading-text").textContent =
+            "Conectando em " + ip + ". " + (MESSAGES[action] || "");
+        document.getElementById("loading").hidden = false;
     });
 
     // Back button from the result page restores the page from cache with the overlay still showing
     window.addEventListener("pageshow", function () {
-        document.getElementById("carregando").hidden = true;
+        document.getElementById("loading").hidden = true;
     });
 }
 
-document.querySelectorAll("[data-copiar]").forEach(function (botao) {
-    botao.addEventListener("click", function () {
-        var texto = document.getElementById(botao.dataset.copiar).textContent;
-        var feito = function () {
-            botao.textContent = "Copiado!";
-            setTimeout(function () { botao.textContent = "Copiar"; }, 1500);
+document.querySelectorAll("[data-copy]").forEach(function (button) {
+    button.addEventListener("click", function () {
+        var text = document.getElementById(button.dataset.copy).textContent;
+        var done = function () {
+            button.textContent = "Copiado!";
+            setTimeout(function () { button.textContent = "Copiar"; }, 1500);
         };
         // The app runs on 127.0.0.1 (a secure context), so the Clipboard API is available
-        navigator.clipboard.writeText(texto).then(feito).catch(function () {
-            botao.textContent = "Erro ao copiar";
-            setTimeout(function () { botao.textContent = "Copiar"; }, 1500);
+        navigator.clipboard.writeText(text).then(done).catch(function () {
+            button.textContent = "Erro ao copiar";
+            setTimeout(function () { button.textContent = "Copiar"; }, 1500);
         });
     });
 });

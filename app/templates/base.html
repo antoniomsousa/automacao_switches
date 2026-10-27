@@ -8,17 +8,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <header class="topo">
-    <div class="container topo-conteudo">
-      <a class="marca" href="{{ url_for('switch.formulario') }}">
-        {% if logo_empresa %}
-          <img class="logo-empresa" src="{{ logo_empresa }}" alt="Mercado Livre">
+  <header class="top">
+    <div class="container header-content">
+      <a class="brand" href="{{ url_for('switch.form_page') }}">
+        {% if company_logo %}
+          <img class="company-logo" src="{{ company_logo }}" alt="Mercado Livre">
         {% else %}
-          <span class="logo-empresa-texto">mercado<br>livre</span>
+          <span class="company-logo-text">mercado<br>livre</span>
         {% endif %}
-        <span class="divisor"></span>
+        <span class="divider"></span>
         <img class="logo-switch" src="{{ url_for('static', filename='img/switch-automation.svg') }}" alt="">
-        <span class="titulo">
+        <span class="title">
           <strong>Switch Wizard</strong>
           <small>Automação de switches</small>
         </span>
@@ -30,7 +30,7 @@
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="rodape container">Switch Wizard · Infraestrutura de Redes Meli</footer>
+  <footer class="footer container">Switch Wizard · Infraestrutura de Redes Meli</footer>
 
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

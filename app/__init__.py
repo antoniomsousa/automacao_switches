@@ -4,7 +4,7 @@ from flask import Flask, url_for
 from flask_wtf.csrf import CSRFProtect
 
 # Company logo: drop the official file in app/static/img/ with one of these names
-LOGOS_EMPRESA = ("logo-meli.svg", "logo-meli.png")
+COMPANY_LOGOS = ("logo-meli.svg", "logo-meli.png")
 
 
 def create_app():
@@ -19,10 +19,10 @@ def create_app():
     app.register_blueprint(switch_bp)
 
     @app.context_processor
-    def logo_empresa():
-        for nome in LOGOS_EMPRESA:
-            if os.path.exists(os.path.join(app.static_folder, "img", nome)):
-                return {"logo_empresa": url_for("static", filename="img/" + nome)}
-        return {"logo_empresa": None}
+    def company_logo():
+        for name in COMPANY_LOGOS:
+            if os.path.exists(os.path.join(app.static_folder, "img", name)):
+                return {"company_logo": url_for("static", filename="img/" + name)}
+        return {"company_logo": None}
 
     return app

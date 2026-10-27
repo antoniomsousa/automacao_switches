@@ -6,24 +6,24 @@ from app import create_app
 from tests import fake_switch
 
 
-def porta_livre():
+def free_port():
     with socket.socket() as s:
         s.bind((fake_switch.HOST, 0))
         return s.getsockname()[1]
 
 
 @pytest.fixture(scope="session")
-def porta_switch():
+def switch_port():
     """Fake switch on a free port, so tests don't collide with a lab switch on 6000."""
-    porta = porta_livre()
-    net = fake_switch.cria_switch(porta)
+    port = free_port()
+    net = fake_switch.create_switch(port)
     net.start()
-    yield porta
+    yield port
     net.stop()
 
 
 @pytest.fixture
-def switch_fake(porta_switch):
+def switch_shell(switch_port):
     """Shell class of the fake switch, with state reset before each test."""
     fake_switch.SwitchShell.reset()
     return fake_switch.SwitchShell
@@ -38,6 +38,6 @@ def client():
 
 
 @pytest.fixture
-def acesso(porta_switch):
-    return {"ip": fake_switch.HOST, "port": str(porta_switch),
+def access(switch_port):
+    return {"ip": fake_switch.HOST, "port": str(switch_port),
             "username": fake_switch.USERNAME, "password": fake_switch.PASSWORD}
