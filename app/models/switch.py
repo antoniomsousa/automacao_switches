@@ -95,6 +95,6 @@ class Switch:
             return config
         block = "! VLANs do vlan.dat (show vlan brief)\n" + "".join("vlan %s\n name %s\n!\n" % v for v in missing)
         # Before the interfaces, so switchport access vlan refers to VLANs that already exist on restore
-        m = re.search(r"^(interface |end$)", config, re.M)
+        m = re.search(r"^(?:interface .*|end)$", config, re.M)
         pos = m.start() if m else len(config)
         return config[:pos] + block + config[pos:]

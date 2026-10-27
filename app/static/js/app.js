@@ -1,10 +1,10 @@
 // Client-side checks mirror app/models/validation.py; the server validates again
-var RESERVED_VLANS = [1, 1002, 1003, 1004, 1005];
+var RESERVED_VLANS = new Set([1, 1002, 1003, 1004, 1005]);
 
 var VALIDATIONS = {
     vlan_id: function (v) {
         if (!/^\d+$/.test(v) || +v < 1 || +v > 4094) return "VLAN ID deve ser um número entre 1 e 4094.";
-        if (RESERVED_VLANS.includes(+v)) return "VLAN " + v + " é reservada e não pode ser criada.";
+        if (RESERVED_VLANS.has(+v)) return "VLAN " + v + " é reservada e não pode ser criada.";
     },
     vlan_name: function (v) {
         if (!/^[A-Za-z0-9_-]{1,32}$/.test(v)) return "1-32 caracteres: letras, números, _ ou -, sem espaços.";
