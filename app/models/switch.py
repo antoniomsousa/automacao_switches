@@ -1,9 +1,10 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from netmiko import ConnectHandler
 from netmiko.exceptions import ConfigInvalidException, NetmikoAuthenticationException, NetmikoTimeoutException
 
+from app.models import compliance
 from app.models.validation import RESERVED_VLANS
 
 # IOS error messages after a rejected config command
@@ -16,11 +17,17 @@ class SwitchError(Exception):
 
 @dataclass
 class Execution:
-    """What was done on the switch: commands sent, switch output, and a show command confirming the result."""
+    """What was done on the switch: commands sent, switch output, a show command confirming the result,
+    and the checks comparing that show output with the desired configuration."""
     commands: list
     output: str
     verification_cmd: str
     verification: str
+    checks: list = field(default_factory=list)
+
+    @property
+    def divergences(self):
+        return [c.divergence for c in self.checks if not c.ok]
 
 
 class Switch:
@@ -61,22 +68,36 @@ class Switch:
         except ConfigInvalidException as e:
             raise SwitchError("O switch rejeitou o comando: %s" % e)
 
-    def create_vlan(self, vlan_id, vlan_name):
-        commands = ["vlan %s" % vlan_id, "name %s" % vlan_name]
+    def create_vlans(self, vlans):
+        """Create [(vlan_id, vlan_name), ...] in a single config session, then check each one on the switch."""
+        commands = [command for vlan_id, vlan_name in vlans for command in ("vlan %s" % vlan_id, "name %s" % vlan_name)]
         output = self._configure(commands)
         # send_config_set wraps the commands in configure terminal / end
-        return self._execution(["configure terminal", *commands, "end"], output, "show vlan id %s" % vlan_id)
+        execution = self._execution(["configure terminal", *commands, "end"], output, "show vlan brief")
+        execution.checks = [compliance.vlan_check(execution.verification, vlan_id, vlan_name) for vlan_id, vlan_name in vlans]
+        return execution
 
     def change_hostname(self, hostname):
         commands = ["hostname %s" % hostname]
         # The prompt changes with the hostname, so skip command echo verification and re-read the prompt
         output = self._configure(commands, cmd_verify=False)
         self.conn.set_base_prompt()
-        return self._execution(["configure terminal", *commands, "end"], output, "show running-config | include hostname")
+        execution = self._execution(["configure terminal", *commands, "end"], output,
+                                    "show running-config | include ^hostname")
+        execution.checks = [compliance.hostname_check(execution.verification, hostname)]
+        return execution
 
     def save_config(self):
         output = self.conn.save_config(cmd="write memory")
         return self._execution(["write memory"], output, "show startup-config")
+
+    def check_standard(self):
+        """Compare the switch with the standard configuration (VLANs 10/20/50 and hostname); changes nothing."""
+        vlans = self.conn.send_command("show vlan brief")
+        hostname_cmd = "show running-config | include ^hostname"
+        execution = Execution(["show vlan brief", hostname_cmd], vlans, hostname_cmd, self.conn.send_command(hostname_cmd))
+        execution.checks = compliance.standard_checks(vlans, execution.verification)
+        return execution
 
     def running_config(self):
         """Return (hostname, running-config including the VLANs)."""
@@ -88,9 +109,9 @@ class Switch:
         """In VTP server/client mode IOS keeps VLANs in vlan.dat, not in the running-config:
         add the ones from show vlan brief that the config doesn't already have."""
         brief = self.conn.send_command("show vlan brief")
-        vlans = re.findall(r"^(\d+)\s+(\S+)\s+(?:active|act/|sus)", brief, re.M)
-        in_config = set(re.findall(r"^vlan (\d+)$", config, re.M))
-        missing = [(i, name) for i, name in vlans if int(i) not in RESERVED_VLANS and i not in in_config]
+        in_config = {int(i) for i in re.findall(r"^vlan (\d+)$", config, re.M)}
+        missing = [(i, name) for i, name in compliance.parse_vlans(brief).items()
+                   if i not in RESERVED_VLANS and i not in in_config]
         if not missing:
             return config
         block = "! VLANs do vlan.dat (show vlan brief)\n" + "".join("vlan %s\n name %s\n!\n" % v for v in missing)

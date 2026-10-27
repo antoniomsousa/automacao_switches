@@ -50,21 +50,29 @@
     <section class="card section">
       <h2 class="card-title">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5Zm-8.6 9.3L2 12l10 5 10-5-1.4-.7L12 15.6 3.4 11.3Zm0 5L2 17l10 5 10-5-1.4-.7L12 20.6l-8.6-4.3Z"/></svg>
-        Criar VLAN
+        Criar VLANs
       </h2>
-      <div class="row">
-        <label class="field field-short">
-          <span>VLAN ID</span>
-          <input type="number" name="vlan_id" min="2" max="4094" placeholder="2–4094" data-validate="vlan_id">
-          <small class="field-error"></small>
-        </label>
-        <label class="field">
-          <span>Nome da VLAN</span>
-          <input type="text" name="vlan_name" maxlength="32" placeholder="ex.: USUARIOS" data-validate="vlan_name">
-          <small class="field-error"></small>
-        </label>
+      <p class="hint">Todas as VLANs da lista são criadas na mesma sessão e validadas no switch em seguida.</p>
+      <div id="vlan-rows">
+        <div class="row vlan-row">
+          <label class="field field-short">
+            <span>VLAN ID</span>
+            <input type="number" name="vlan_id" min="2" max="4094" placeholder="2–4094" data-validate="vlan_id">
+            <small class="field-error"></small>
+          </label>
+          <label class="field">
+            <span>Nome da VLAN</span>
+            <input type="text" name="vlan_name" maxlength="32" placeholder="ex.: USUARIOS" data-validate="vlan_name">
+            <small class="field-error"></small>
+          </label>
+          <button type="button" class="remove-vlan" aria-label="Remover VLAN" title="Remover VLAN">×</button>
+        </div>
       </div>
-      <button type="submit" class="btn btn-primary" name="action" value="create_vlan">Criar VLAN</button>
+      <div class="button-row">
+        <button type="button" class="btn btn-secondary" id="add-vlan">+ Adicionar VLAN</button>
+        <button type="button" class="btn btn-secondary" id="fill-standard" title="VLAN 10 VLAN_DADOS, VLAN 20 VLAN_VOZ, VLAN 50 VLAN_SEGURANCA">Preencher padrão (10, 20, 50)</button>
+      </div>
+      <button type="submit" class="btn btn-primary" name="action" value="create_vlan">Criar VLANs</button>
     </section>
 
     <section class="card section">
@@ -95,7 +103,12 @@
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2Zm7-3 6-6-1.4-1.4L13 13.2V3h-2v10.2L7.4 9.6 6 11l6 6Z"/></svg>
           Baixar backup
         </button>
+        <button type="submit" class="btn btn-secondary" name="action" value="validate">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>
+          Validar configuração
+        </button>
       </div>
+      <p class="hint">Validar compara o switch com o padrão: VLANs 10 (VLAN_DADOS), 20 (VLAN_VOZ), 50 (VLAN_SEGURANCA) e hostname SWITCH_AUTOMATIZADO.</p>
     </section>
   </div>
 </form>

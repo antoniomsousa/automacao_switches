@@ -6,6 +6,7 @@
   --green: #00A650;
   --green-hover: #008C44;
   --red: #F23D4F;
+  --orange: #E67700;
   --text: #333333;
   --text-muted: #737373;
   --border: #E0E0E0;
@@ -106,6 +107,18 @@ input.invalid:focus { box-shadow: 0 0 0 3px rgba(242, 61, 79, .2); }
 .btn-secondary:hover { background: rgba(52, 131, 250, .22); }
 .button-row { display: flex; gap: 12px; flex-wrap: wrap; }
 
+/* VLAN list */
+#vlan-rows .vlan-row { flex-wrap: nowrap; align-items: flex-start; }
+#vlan-rows .vlan-row + .vlan-row .field > span:first-child { display: none; }  /* labels only on the first row */
+.remove-vlan {
+  flex: none; width: 40px; height: 42px; margin-top: 25px; border: 1px solid #BFBFBF; border-radius: 6px;
+  background: #fff; color: var(--text-muted); font-size: 20px; line-height: 1; cursor: pointer;
+}
+.vlan-row + .vlan-row .remove-vlan { margin-top: 0; }
+.remove-vlan:hover { border-color: var(--red); color: var(--red); }
+#vlan-rows .vlan-row:only-child .remove-vlan { visibility: hidden; }  /* always keep one row */
+#vlan-rows + .button-row { margin-bottom: 16px; }
+
 /* Loading overlay */
 .loading {
   position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
@@ -139,6 +152,16 @@ input.invalid:focus { box-shadow: 0 0 0 3px rgba(242, 61, 79, .2); }
 .status-success .status-icon { fill: var(--green); }
 .status-error { border-color: var(--red); }
 .status-error .status-icon { fill: var(--red); }
+.status-warning { border-color: var(--orange); }
+.status-warning .status-icon { fill: var(--orange); }
+.divergences { margin: 8px 0; padding-left: 20px; color: var(--red); font-weight: 600; }
+
+.checks { width: 100%; border-collapse: collapse; font-size: 14px; }
+.checks th, .checks td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.checks th { color: var(--text-muted); font-weight: 600; }
+.check-ok td:last-child { color: var(--green); font-weight: 600; }
+.check-divergent td { background: #FFF1F2; }
+.check-divergent td:last-child { color: var(--red); font-weight: 600; }
 
 .terminal-card { padding: 0; overflow: hidden; }
 .terminal-header {

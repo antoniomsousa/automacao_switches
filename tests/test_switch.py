@@ -1,4 +1,6 @@
 """Tests of every app action against the fake switch, through the Flask test client."""
+import pytest
+
 from tests import fake_switch
 
 SUCCESS = 'data-status="success"'
@@ -33,7 +35,7 @@ def test_create_vlan(client, access, switch_shell):
     # Result page shows commands, switch output and the verification show command
     assert '<pre id="cmd-commands" class="terminal">configure terminal\nvlan 10\nname USUARIOS\nend</pre>' in body
     assert "(config-vlan)#" in body
-    assert "show vlan id 10" in body
+    assert "show vlan brief" in body
     assert "10   USUARIOS" in body
 
 
@@ -49,13 +51,116 @@ def test_create_vlan_rejected(client, access, switch_shell, monkeypatch):
     assert 20 not in switch_shell.state["vlans"]
 
 
+def test_create_vlan_validated(client, access, switch_shell):
+    body = post(client, access, action="create_vlan", vlan_id="10", vlan_name="VLAN_DADOS").get_data(as_text=True)
+    assert '<tr class="check-ok">' in body
+    assert "<td>VLAN 10</td><td>VLAN_DADOS</td><td>VLAN_DADOS</td>" in body
+
+
+def test_create_vlan_divergence(client, access, switch_shell, monkeypatch):
+    # The switch accepts "name" but keeps the default name: the result must be an alert, not a success
+    execute = switch_shell._execute
+    monkeypatch.setattr(switch_shell, "_execute",
+                        lambda self, line: None if line.startswith("name ") else execute(self, line))
+    body = post(client, access, action="create_vlan", vlan_id="20", vlan_name="VLAN_VOZ").get_data(as_text=True)
+    assert SUCCESS not in body
+    assert 'data-status="divergence"' in body
+    assert "Configuração não padrão encontrada" in body
+    assert "<li>VLAN 20: esperado VLAN_VOZ, encontrado VLAN0020</li>" in body
+
+
+def test_change_hostname_divergence(client, access, switch_shell, monkeypatch):
+    execute = switch_shell._execute
+    monkeypatch.setattr(switch_shell, "_execute",
+                        lambda self, line: None if line.startswith("hostname ") else execute(self, line))
+    body = post(client, access, action="hostname", hostname="SWITCH_AUTOMATIZADO").get_data(as_text=True)
+    assert 'data-status="divergence"' in body
+    assert "<li>Hostname: esperado SWITCH_AUTOMATIZADO, encontrado SW-LAB</li>" in body
+
+
+def test_validate_standard_config(client, access, switch_shell):
+    # Fresh switch: none of the standard VLANs and the default hostname
+    body = post(client, access, action="validate").get_data(as_text=True)
+    assert 'data-status="divergence"' in body
+    for divergence in ("VLAN 10: esperado VLAN_DADOS, encontrado (não existe)",
+                       "VLAN 50: esperado VLAN_SEGURANCA, encontrado (não existe)",
+                       "Hostname: esperado SWITCH_AUTOMATIZADO, encontrado SW-LAB"):
+        assert "<li>%s</li>" % divergence in body
+
+    # Configured through the frontend in one request, VLAN 50 typed with the accent as in the challenge
+    post(client, access, action="create_vlan", vlan_id=["10", "20", "50"], vlan_name=["VLAN_DADOS", "VLAN_VOZ", "VLAN_SEGURANÇA"])
+    post(client, access, action="hostname", hostname="SWITCH_AUTOMATIZADO")
+    body = post(client, access, action="validate").get_data(as_text=True)
+    assert SUCCESS in body
+    assert "Divergente" not in body
+    assert body.count('<tr class="check-ok">') == 4
+
+
+def test_create_vlan_accented_name(client, access, switch_shell):
+    body = post(client, access, action="create_vlan", vlan_id="50", vlan_name="VLAN_SEGURANÇA").get_data(as_text=True)
+    assert SUCCESS in body
+    assert switch_shell.state["vlans"][50] == "VLAN_SEGURANCA"
+    assert "O nome VLAN_SEGURANÇA foi convertido para VLAN_SEGURANCA" in body
+
+
+def test_create_several_vlans(client, access, switch_shell):
+    body = post(client, access, action="create_vlan", vlan_id=["10", "20", "50"],
+                vlan_name=["VLAN_DADOS", "VLAN_VOZ", "VLAN_SEGURANCA"]).get_data(as_text=True)
+    assert SUCCESS in body
+    assert "3 VLANs criadas com sucesso: 10 (VLAN_DADOS), 20 (VLAN_VOZ), 50 (VLAN_SEGURANCA)." in body
+    assert {i: switch_shell.state["vlans"][i] for i in (10, 20, 50)} == {10: "VLAN_DADOS", 20: "VLAN_VOZ", 50: "VLAN_SEGURANCA"}
+    # One config session with every VLAN, then one check per VLAN
+    assert ('<pre id="cmd-commands" class="terminal">configure terminal\nvlan 10\nname VLAN_DADOS\nvlan 20\nname VLAN_VOZ\n'
+            'vlan 50\nname VLAN_SEGURANCA\nend</pre>') in body
+    assert body.count('<tr class="check-ok">') == 3
+
+
+def test_several_vlans_one_divergent(client, access, switch_shell, monkeypatch):
+    # The switch ignores the name of VLAN 20 only: the alert names that VLAN, the others are OK
+    execute = switch_shell._execute
+    monkeypatch.setattr(switch_shell, "_execute",
+                        lambda self, line: None if line == "name VLAN_VOZ" else execute(self, line))
+    body = post(client, access, action="create_vlan", vlan_id=["10", "20"],
+                vlan_name=["VLAN_DADOS", "VLAN_VOZ"]).get_data(as_text=True)
+    assert 'data-status="divergence"' in body
+    assert "<li>VLAN 20: esperado VLAN_VOZ, encontrado VLAN0020</li>" in body
+    assert body.count('<tr class="check-ok">') == 1
+
+
+def test_empty_rows_are_ignored(client, access, switch_shell):
+    body = post(client, access, action="create_vlan", vlan_id=["", "30", " "],
+                vlan_name=["", "CFTV", ""]).get_data(as_text=True)
+    assert "VLAN 30 (CFTV) criada com sucesso." in body
+
+
+@pytest.mark.parametrize("ids, names, message", [
+    (["10", "10"], ["A", "B"], "Linha 2: a VLAN 10 aparece mais de uma vez."),
+    (["10", "4095"], ["A", "B"], "Linha 2: VLAN ID deve ser um número entre 1 e 4094."),
+    (["10", "20"], ["A", "com espaco"], "Linha 2: Nome da VLAN deve ter"),
+    (["", ""], ["", ""], "Informe pelo menos uma VLAN"),
+])
+def test_vlan_list_errors(client, ids, names, message):
+    # Rejected before connecting: the switch address isn't even reachable
+    access = {"ip": "192.0.2.1", "port": "22", "username": "u", "password": "p"}
+    body = post(client, access, action="create_vlan", vlan_id=ids, vlan_name=names).get_data(as_text=True)
+    assert 'data-status="error"' in body
+    assert message in body
+
+
+def test_too_many_vlans(client):
+    access = {"ip": "192.0.2.1", "port": "22", "username": "u", "password": "p"}
+    ids = [str(i) for i in range(2, 53)]
+    body = post(client, access, action="create_vlan", vlan_id=ids, vlan_name=["V%s" % i for i in ids]).get_data(as_text=True)
+    assert "no máximo 50 VLANs" in body
+
+
 def test_change_hostname(client, access, switch_shell):
     r = post(client, access, action="hostname", hostname="SW_ANDAR1")
     body = r.get_data(as_text=True)
     assert SUCCESS in body
     assert switch_shell.state["hostname"] == "SW_ANDAR1"
     assert '<pre id="cmd-commands" class="terminal">configure terminal\nhostname SW_ANDAR1\nend</pre>' in body
-    assert "show running-config | include hostname" in body
+    assert "show running-config | include ^hostname" in body
     assert '<pre id="cmd-verification" class="terminal">hostname SW_ANDAR1</pre>' in body
 
     # Second change starts from the new prompt

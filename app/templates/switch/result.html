@@ -1,7 +1,19 @@
 {% extends "base.html" %}
 
 {% block content %}
-{% if success %}
+{% if success and divergences %}
+<section class="status status-warning" data-status="divergence">
+  <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 21h22L12 2 1 21Zm12-3h-2v-2h2v2Zm0-4h-2v-4h2v4Z"/></svg>
+  <div>
+    <h1>Configuração não padrão encontrada</h1>
+    <p>{{ message }}</p>
+    <ul class="divergences">
+      {% for divergence in divergences %}<li>{{ divergence }}</li>{% endfor %}
+    </ul>
+    {% if ip %}<small>Switch {{ ip }} · {{ action_title }}</small>{% endif %}
+  </div>
+</section>
+{% elif success %}
 <section class="status status-success" data-status="success">
   <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-2 15-5-5 1.4-1.4 3.6 3.6 7.6-7.6L19 8l-9 9Z"/></svg>
   <div>
@@ -10,10 +22,29 @@
     {% if ip %}<small>Switch {{ ip }} · {{ action_title }}</small>{% endif %}
   </div>
 </section>
+{% endif %}
+
+{% if success %}
+{% if execution.checks %}
+<section class="card">
+  <h2>Validação: configuração desejada × switch</h2>
+  <table class="checks">
+    <thead><tr><th>Item</th><th>Esperado</th><th>Encontrado no switch</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for check in execution.checks %}
+      <tr class="{{ 'check-ok' if check.ok else 'check-divergent' }}">
+        <td>{{ check.item }}</td><td>{{ check.expected }}</td><td>{{ check.found }}</td>
+        <td>{{ 'OK' if check.ok else 'Divergente' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 
 <section class="card terminal-card">
   <div class="terminal-header">
-    <h2>1. Comandos aplicados</h2>
+    <h2>1. Comandos executados</h2>
     <button type="button" class="copy" data-copy="cmd-commands">Copiar</button>
   </div>
   <pre id="cmd-commands" class="terminal">{{ execution.commands | join('\n') }}</pre>

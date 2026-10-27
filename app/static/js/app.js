@@ -7,7 +7,9 @@ var VALIDATIONS = {
         if (RESERVED_VLANS.has(+v)) return "VLAN " + v + " é reservada e não pode ser criada.";
     },
     vlan_name: function (v) {
-        if (!/^[A-Za-z0-9_-]{1,32}$/.test(v)) return "1-32 caracteres: letras, números, _ ou -, sem espaços.";
+        // Accents are removed by the server (VLAN_SEGURANÇA -> VLAN_SEGURANCA), so check the name without them
+        var ascii = v.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+        if (!/^[A-Za-z0-9_-]{1,32}$/.test(ascii)) return "1-32 caracteres: letras, números, _ ou -, sem espaços.";
     },
     hostname: function (v) {
         if (!/^[A-Za-z]([A-Za-z0-9_-]{0,61}[A-Za-z0-9])?$/.test(v))
@@ -19,9 +21,10 @@ var VALIDATIONS = {
 };
 
 var MESSAGES = {
-    create_vlan: "Criando a VLAN no switch...",
+    create_vlan: "Criando as VLANs no switch...",
     hostname: "Alterando o hostname...",
-    save: "Salvando a configuração na NVRAM..."
+    save: "Salvando a configuração na NVRAM...",
+    validate: "Comparando a configuração do switch com o padrão..."
 };
 
 function markError(input, message) {
@@ -48,8 +51,88 @@ function validateSections(button) {
     inputs.forEach(function (input) {
         if (!validateField(input) && !firstInvalid) firstInvalid = input;
     });
+    if (button.value === "create_vlan") firstInvalid = firstInvalid || markRepeatedVlans();
     if (firstInvalid) firstInvalid.focus();
     return !firstInvalid;
+}
+
+// VLAN list: several rows of ID + name, all sent in the same request
+
+var STANDARD_VLANS = [["10", "VLAN_DADOS"], ["20", "VLAN_VOZ"], ["50", "VLAN_SEGURANCA"]];
+
+function vlanRows() {
+    return Array.prototype.slice.call(document.querySelectorAll("#vlan-rows .vlan-row"));
+}
+
+function rowInputs(row) {
+    return [row.querySelector("[name=vlan_id]"), row.querySelector("[name=vlan_name]")];
+}
+
+// First repeated VLAN ID, flagged on its field (the server checks it too)
+function markRepeatedVlans() {
+    var seen = {};
+    var repeated = null;
+    vlanRows().forEach(function (row) {
+        var input = rowInputs(row)[0];
+        var id = String(+input.value);
+        if (seen[id] && !repeated) {
+            markError(input, "VLAN repetida na lista.");
+            repeated = input;
+        }
+        seen[id] = true;
+    });
+    return repeated;
+}
+
+// Rows left completely empty are dropped before sending, as long as one row remains
+function removeEmptyRows() {
+    vlanRows().forEach(function (row) {
+        var empty = rowInputs(row).every(function (input) { return !input.value.trim(); });
+        if (empty && vlanRows().length > 1) row.remove();
+    });
+}
+
+function addVlanRow(id, name) {
+    var rows = document.getElementById("vlan-rows");
+    var row = rows.querySelector(".vlan-row").cloneNode(true);
+    var inputs = rowInputs(row);
+    inputs[0].value = id || "";
+    inputs[1].value = name || "";
+    inputs.forEach(function (input) {
+        markError(input, "");
+        bindInput(input);
+    });
+    bindRemove(row.querySelector(".remove-vlan"));
+    rows.appendChild(row);
+    return row;
+}
+
+function bindRemove(button) {
+    button.addEventListener("click", function () {
+        if (vlanRows().length > 1) button.closest(".vlan-row").remove();
+    });
+}
+
+function fillStandard() {
+    vlanRows().slice(1).forEach(function (row) { row.remove(); });
+    var first = rowInputs(vlanRows()[0]);
+    first[0].value = STANDARD_VLANS[0][0];
+    first[1].value = STANDARD_VLANS[0][1];
+    first.forEach(function (input) { markError(input, ""); });
+    STANDARD_VLANS.slice(1).forEach(function (vlan) { addVlanRow(vlan[0], vlan[1]); });
+}
+
+// Enter would submit with the form's first button (Criar VLANs); use the button of the section being typed in instead
+function bindInput(input) {
+    input.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        var button = input.closest(".section").querySelector("button[name=action]");
+        if (button) button.click();
+    });
+    input.addEventListener("input", function () {
+        if (input.classList.contains("invalid")) validateField(input);
+    });
 }
 
 function remember(form) {
@@ -75,22 +158,17 @@ if (form) {
 
     form.querySelectorAll("button[name=action]").forEach(function (button) {
         button.addEventListener("click", function (e) {
+            if (button.value === "create_vlan") removeEmptyRows();
             if (!validateSections(button)) e.preventDefault();
         });
     });
 
-    // Enter would submit with the form's first button (Criar VLAN); use the button of the section being typed in instead
-    form.querySelectorAll("input").forEach(function (input) {
-        input.addEventListener("keydown", function (e) {
-            if (e.key !== "Enter") return;
-            e.preventDefault();
-            var button = input.closest(".section").querySelector("button[name=action]");
-            if (button) button.click();
-        });
-        input.addEventListener("input", function () {
-            if (input.classList.contains("invalid")) validateField(input);
-        });
+    form.querySelectorAll("input").forEach(bindInput);
+    form.querySelectorAll(".remove-vlan").forEach(bindRemove);
+    document.getElementById("add-vlan").addEventListener("click", function () {
+        rowInputs(addVlanRow())[0].focus();
     });
+    document.getElementById("fill-standard").addEventListener("click", fillStandard);
 
     form.querySelectorAll(".toggle-password").forEach(function (button) {
         button.addEventListener("click", function () {
