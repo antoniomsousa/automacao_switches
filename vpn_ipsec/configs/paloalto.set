@@ -1,0 +1,64 @@
+# Palo Alto (site B) - route-based IPsec VPN to the FortiGate (site A), PAN-OS 10.x/11.x "set" format.
+# Same objects as vpn_ipsec/paloalto.py writes through the XML API, with the values of params.yaml.
+# In the CLI: "configure", paste, then "commit". Replace <PSK> with the pre-shared key.
+
+# Crypto profiles: phase 1 IKEv2 AES-256-CBC / SHA-256 / group14, 8 h; phase 2 ESP AES-256-CBC / SHA-256, PFS group14, 1 h
+set network ike crypto-profiles ike-crypto-profiles FGT-PA-IKE encryption aes-256-cbc
+set network ike crypto-profiles ike-crypto-profiles FGT-PA-IKE hash sha256
+set network ike crypto-profiles ike-crypto-profiles FGT-PA-IKE dh-group group14
+set network ike crypto-profiles ike-crypto-profiles FGT-PA-IKE lifetime seconds 28800
+set network ike crypto-profiles ipsec-crypto-profiles FGT-PA-IPSEC esp encryption aes-256-cbc
+set network ike crypto-profiles ipsec-crypto-profiles FGT-PA-IPSEC esp authentication sha256
+set network ike crypto-profiles ipsec-crypto-profiles FGT-PA-IPSEC dh-group group14
+set network ike crypto-profiles ipsec-crypto-profiles FGT-PA-IPSEC lifetime seconds 3600
+
+# Tunnel interface 169.255.1.2/30, answers ping (tunnel monitor), in the virtual router, the vsys and zone "vpn"
+set network profiles interface-management-profile FGT-PA-ping ping yes
+set network interface tunnel units tunnel.10 ip 169.255.1.2/30
+set network interface tunnel units tunnel.10 interface-management-profile FGT-PA-ping
+set network interface tunnel units tunnel.10 comment FGT-PA
+set network virtual-router default interface tunnel.10
+set import network interface tunnel.10
+set zone vpn network layer3 tunnel.10
+
+# IKE gateway: IKEv2 only, PSK, peer = FortiGate WAN
+set network ike gateway FGT-PA-GW authentication pre-shared-key key <PSK>
+set network ike gateway FGT-PA-GW protocol version ikev2
+set network ike gateway FGT-PA-GW protocol ikev2 ike-crypto-profile FGT-PA-IKE
+set network ike gateway FGT-PA-GW protocol ikev2 dpd enable yes
+set network ike gateway FGT-PA-GW protocol-common nat-traversal enable yes
+set network ike gateway FGT-PA-GW local-address interface ethernet1/1
+set network ike gateway FGT-PA-GW local-address ip 198.51.100.1/24
+set network ike gateway FGT-PA-GW peer-address ip 203.0.113.1
+
+# IPsec tunnel: proxy-ID mirrors the FortiGate phase2 selectors (local and remote swapped); tunnel monitor pings 169.255.1.1
+set network tunnel ipsec FGT-PA tunnel-interface tunnel.10
+set network tunnel ipsec FGT-PA auto-key ike-gateway FGT-PA-GW
+set network tunnel ipsec FGT-PA auto-key ipsec-crypto-profile FGT-PA-IPSEC
+set network tunnel ipsec FGT-PA auto-key proxy-id FGT-PA-lans local 10.20.0.0/24
+set network tunnel ipsec FGT-PA auto-key proxy-id FGT-PA-lans remote 10.10.0.0/24
+set network tunnel ipsec FGT-PA auto-key proxy-id FGT-PA-lans protocol any
+set network tunnel ipsec FGT-PA tunnel-monitor enable yes
+set network tunnel ipsec FGT-PA tunnel-monitor destination-ip 169.255.1.1
+
+# Route to the FortiGate LAN through the tunnel
+set network virtual-router default routing-table ip static-route FGT-PA-route destination 10.10.0.0/24
+set network virtual-router default routing-table ip static-route FGT-PA-route interface tunnel.10
+set network virtual-router default routing-table ip static-route FGT-PA-route metric 10
+
+# Address objects and security rules in both directions (zone-based: traffic to zone "vpn" doesn't hit the
+# source NAT rule to zone "untrust", so no NAT exemption is needed)
+set address FGT-PA-local ip-netmask 10.20.0.0/24
+set address FGT-PA-remote ip-netmask 10.10.0.0/24
+set rulebase security rules FGT-PA-out from trust to vpn source FGT-PA-local destination FGT-PA-remote
+set rulebase security rules FGT-PA-out source-user any application any service any action allow log-end yes
+set rulebase security rules FGT-PA-in from vpn to trust source FGT-PA-remote destination FGT-PA-local
+set rulebase security rules FGT-PA-in source-user any application any service any action allow log-end yes
+
+# Verification (operational mode)
+# show vpn ike-sa gateway FGT-PA-GW
+# show vpn ipsec-sa tunnel FGT-PA
+# show vpn flow name FGT-PA
+# test vpn ike-sa gateway FGT-PA-GW
+# test vpn ipsec-sa tunnel FGT-PA
+# ping source 169.255.1.2 host 169.255.1.1

@@ -1,0 +1,49 @@
+# Parameters of the route-based IPsec VPN between the FortiGate (site A) and the Palo Alto (site B).
+# Single source of truth: the automation scripts, the example configs and PLAN.md all use these values.
+# WAN and management addresses are documentation ranges (RFC 5737): replace them with the real ones.
+# The pre-shared key is NOT here: it comes from the environment variable named in psk_env (or a vault).
+
+vpn_name: FGT-PA
+
+tunnel_network: 169.255.1.0/30
+
+fortigate:
+  host: 192.0.2.10              # management address (REST API)
+  vdom: root
+  wan_interface: port1
+  wan_ip: 203.0.113.1/24
+  lan_interface: port2
+  lan_network: 10.10.0.0/24
+  tunnel_interface: VPN-TO-PA   # phase1-interface name, also the tunnel interface (max 15 characters)
+  tunnel_ip: 169.255.1.1
+
+paloalto:
+  host: 192.0.2.20              # management address (XML API)
+  vsys: vsys1
+  virtual_router: default
+  wan_interface: ethernet1/1
+  wan_ip: 198.51.100.1/24
+  lan_zone: trust
+  lan_network: 10.20.0.0/24
+  vpn_zone: vpn
+  tunnel_interface: tunnel.10
+  tunnel_ip: 169.255.1.2
+
+# Phase 1 (IKE). Vendor-neutral names, translated per vendor by vpn_ipsec/params.py
+ike:
+  version: 2
+  encryption: aes256            # aes128 | aes256
+  integrity: sha256             # sha256 | sha384 | sha512
+  dh_group: 14                  # 14 | 19 | 20 | 21
+  lifetime: 28800               # seconds
+  dpd: true
+  nat_traversal: true
+
+# Phase 2 (IPsec ESP)
+ipsec:
+  encryption: aes256            # aes128 | aes256 | aes128gcm | aes256gcm
+  integrity: sha256             # ignored with GCM (GCM already authenticates)
+  pfs_group: 14                 # 14 | 19 | 20 | 21
+  lifetime: 3600                # seconds
+
+psk_env: VPN_PSK
