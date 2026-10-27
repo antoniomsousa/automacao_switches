@@ -123,6 +123,7 @@ vpn_ipsec/
   alerts.py                   Alerts (log, chat webhook, exit code)
   configs/fortigate.conf      Example FortiOS CLI configuration
   configs/paloalto.set        Example PAN-OS configuration (set format)
+  topology.svg                Topology diagram used in PLAN.md
 ```
 
 ```

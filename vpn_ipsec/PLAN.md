@@ -13,6 +13,7 @@ This is the plan for automating a site-to-site IPsec VPN between a **FortiGate**
 | [`alerts.py`](alerts.py) | Alerts: log, chat webhook and exit code |
 | [`configs/fortigate.conf`](configs/fortigate.conf) | Example FortiOS CLI configuration |
 | [`configs/paloalto.set`](configs/paloalto.set) | Example PAN-OS configuration in `set` format |
+| [`topology.svg`](topology.svg) | Topology diagram (section 1) |
 | [`../tests/test_vpn.py`](../tests/test_vpn.py) | Tests against in-memory FortiOS and PAN-OS APIs ([`fake_firewalls.py`](../tests/fake_firewalls.py)) |
 
 > The code was tested against simulated APIs, not real firewalls. The endpoints, XPaths and CLI commands follow FortiOS 7.x and PAN-OS 10.x/11.x. Before production use, validate them in a lab with the target versions (see [Limitations](#7-limitations-and-next-steps)).
@@ -21,12 +22,7 @@ This is the plan for automating a site-to-site IPsec VPN between a **FortiGate**
 
 ## 1. Topology
 
-```mermaid
-flowchart LR
-    LANA["LAN A<br/>10.10.0.0/24"] --- FGT["FortiGate<br/>WAN port1 203.0.113.1<br/>tunnel VPN-TO-PA 169.255.1.1/30"]
-    FGT ==>|"IPsec IKEv2<br/>route-based<br/>169.255.1.0/30"| PA["Palo Alto<br/>WAN ethernet1/1 198.51.100.1<br/>tunnel.10 169.255.1.2/30"]
-    PA --- LANB["LAN B<br/>10.20.0.0/24"]
-```
+![Topology: FortiGate (site A) and Palo Alto (site B) connected by a route-based IPsec tunnel over the Internet](topology.svg)
 
 The VPN is **route-based**: each side has a tunnel interface with an address in 169.255.1.0/30, and traffic to the remote LAN is sent to that interface by a static route. This model was chosen over policy-based because:
 - both vendors support it natively (FortiGate `phase1-interface`, Palo Alto `tunnel.N`);
